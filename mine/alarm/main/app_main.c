@@ -24,7 +24,7 @@
 
 /* HomeKit Bridge Example
 */
-
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include <stdio.h>
 #include <string.h>
 
@@ -37,16 +37,20 @@
 
 #include <iot_button.h>
 
+#include "iot_debounce.h"
+
 #include <app_wifi.h>
 #include <app_hap_setup_payload.h>
 
-static const char *TAG = "HAP Bridge";
+#include <hap.h>
+
+static const char *TAG = "Alarm App";
 
 #define BRIDGE_TASK_PRIORITY  1
 #define BRIDGE_TASK_STACKSIZE 4 * 1024
 #define BRIDGE_TASK_NAME      "hap_bridge"
 
-#define NUM_BRIDGED_ACCESSORIES 3
+#define NUM_BRIDGED_ACCESSORIES 4
 
 /* Reset network credentials if button is pressed for more than 3 seconds and then released */
 #define RESET_NETWORK_BUTTON_TIMEOUT        3
@@ -56,6 +60,20 @@ static const char *TAG = "HAP Bridge";
 
 /* The button "Boot" will be used as the Reset button for the example */
 #define RESET_GPIO  GPIO_NUM_0
+
+struct contact_t {
+    int i;
+    gpio_num_t gpio;
+    hap_serv_t *service;
+    hap_char_t *characteristic;
+    debounce_handle_t debounce;
+} contacts[] = {
+    { .i = 0, .gpio = GPIO_NUM_14},
+    { .i = 1, .gpio = GPIO_NUM_27},
+    { .i = 2, .gpio = GPIO_NUM_26},
+    { .i = 3, .gpio = GPIO_NUM_25},
+};
+
 /**
  * @brief The network reset button callback handler.
  * Useful for testing the Wi-Fi re-configuration feature of WAC2
@@ -70,6 +88,24 @@ static void reset_network_handler(void* arg)
 static void reset_to_factory_handler(void* arg)
 {
     hap_reset_to_factory();
+}
+
+static void contact_trigger_handler(void* arg)
+{
+  struct contact_t *contact = arg;
+  ESP_LOGE(TAG, "Contact %d triggered.", contact->i);
+  hap_val_t val;
+  val.i = true;
+  hap_char_update_val(contact->characteristic, &val);
+}
+
+static void contact_clear_handler(void* arg)
+{
+  struct contact_t *contact = arg;
+  ESP_LOGE(TAG, "Contact %d cleared.", contact->i);
+  hap_val_t val; 
+  val.i = false;
+  hap_char_update_val(contact->characteristic, &val);
 }
 
 /**
@@ -109,38 +145,6 @@ static int accessory_identify(hap_acc_t *ha)
     return HAP_SUCCESS;
 }
 
-/* A dummy callback for handling a write on the "On" characteristic of Fan.
- * In an actual accessory, this should control the hardware
- */
-static int fan_on(bool value)
-{
-    ESP_LOGI(TAG, "Received Write. Fan %s", value ? "On" : "Off");
-    /* TODO: Control Actual Hardware */
-    return 0;
-}
-
-/* A dummy callback for handling a write on the "On" characteristic of Fan.
- * In an actual accessory, this should control the hardware
- */
-static int fan_write(hap_write_data_t write_data[], int count,
-        void *serv_priv, void *write_priv)
-{
-    ESP_LOGI(TAG, "Write called for Accessory %s", (char *)serv_priv);
-    int i, ret = HAP_SUCCESS;
-    hap_write_data_t *write;
-    for (i = 0; i < count; i++) {
-        write = &write_data[i];
-        if (!strcmp(hap_char_get_type_uuid(write->hc), HAP_CHAR_UUID_ON)) {
-            fan_on(write->val.b);
-            hap_char_update_val(write->hc, &(write->val));
-            *(write->status) = HAP_STATUS_SUCCESS;
-        } else {
-            *(write->status) = HAP_STATUS_RES_ABSENT;
-        }
-    }
-    return ret;
-}
-
 /*The main thread for handling the Bridge Accessory */
 static void bridge_thread_entry(void *p)
 {
@@ -154,21 +158,21 @@ static void bridge_thread_entry(void *p)
      * the mandatory services internally
      */
     hap_acc_cfg_t cfg = {
-        .name = "Esp-Bridge",
-        .manufacturer = "Espressif",
-        .model = "EspBridge01",
-        .serial_num = "001122334455",
-        .fw_rev = "0.9.0",
+        .name = "ESP32-Alarm",
+        .manufacturer = "Me",
+        .model = "alarm01",
+        .serial_num = "00000001",
+        .fw_rev = "1.0.0",
         .hw_rev = NULL,
-        .pv = "1.1.0",
+        .pv = "1.0.0",
         .identify_routine = bridge_identify,
-        .cid = HAP_CID_BRIDGE,
+        .cid = HAP_CID_SECURITY_SYSTEM,
     };
     /* Create accessory object */
     accessory = hap_acc_create(&cfg);
 
     /* Add a dummy Product Data */
-    uint8_t product_data[] = {'E','S','P','3','2','H','A','P'};
+    uint8_t product_data[] = {'E','S','P','A','l','a','r','m'};
     hap_acc_add_product_data(accessory, product_data, sizeof(product_data));
 
     /* Add the Accessory to the HomeKit Database */
@@ -176,25 +180,29 @@ static void bridge_thread_entry(void *p)
 
     /* Create and add the Accessory to the Bridge object*/
     for (uint8_t i = 0; i < NUM_BRIDGED_ACCESSORIES; i++) {
-        char accessory_name[12] = {0};
-        sprintf(accessory_name, "ESP-Fan-%d", i);
+        char accessory_name[16] = {0};
+        sprintf(accessory_name, "Alarm Contact %d", i);
 
         hap_acc_cfg_t bridge_cfg = {
             .name = accessory_name,
-            .manufacturer = "Espressif",
-            .model = "EspFan01",
-            .serial_num = "abcdefg",
-            .fw_rev = "0.9.0",
+            .manufacturer = "Me",
+            .model = "Alarm Contact",
+            .serial_num = "00000001",
+            .fw_rev = "1.0.0",
             .hw_rev = NULL,
-            .pv = "1.1.0",
+            .pv = "1.0.0",
             .identify_routine = accessory_identify,
-            .cid = HAP_CID_BRIDGE,
+            .cid = HAP_CID_SECURITY_SYSTEM,
         };
         /* Create accessory object */
         accessory = hap_acc_create(&bridge_cfg);
 
+        /* Create button before service so we can read the gpio state */
+        contacts[i].debounce = iot_debounce_create(contacts[i].gpio, DEBOUNCE_ACTIVE_HIGH);
+        
         /* Create the Fan Service. Include the "name" since this is a user visible service  */
-        service = hap_serv_fan_create(false);
+        contacts[i].service = service = hap_serv_contact_sensor_create(i%2);
+        contacts[i].characteristic = hap_serv_get_first_char(service);
         hap_serv_add_char(service, hap_char_name_create(accessory_name));
 
         /* Set the Accessory name as the Private data for the service,
@@ -203,14 +211,15 @@ static void bridge_thread_entry(void *p)
          */
         hap_serv_set_priv(service, strdup(accessory_name));
 
-        /* Set the write callback for the service */
-        hap_serv_set_write_cb(service, fan_write);
- 
         /* Add the Fan Service to the Accessory Object */
         hap_acc_add_serv(accessory, service);
 
         /* Add the Accessory to the HomeKit Database */
         hap_add_bridged_accessory(accessory, hap_get_unique_aid(accessory_name));
+        
+        /* Attach to the hardware debounce events */
+        iot_debounce_add_on_release_cb(contacts[i].debounce, contact_clear_handler, contacts+i);
+        iot_debounce_add_on_press_cb(contacts[i].debounce, contact_trigger_handler, contacts+i);
     }
 
     /* Register a common button for reset Wi-Fi network and reset to factory.
@@ -245,11 +254,19 @@ static void bridge_thread_entry(void *p)
 
     /* Initialize Wi-Fi */
     app_wifi_init();
+    esp_netif_set_hostname(wifi_netif, "esp32-alarm"); // Might not work here. Need to test
 
     /* After all the initializations are done, start the HAP core */
     hap_start();
+    
     /* Start Wi-Fi */
     app_wifi_start(portMAX_DELAY);
+
+    /* Start the contact sensors monitoring. Will raise an event for the current state. */
+    for (uint8_t i = 0; i < NUM_BRIDGED_ACCESSORIES; i++) {
+        iot_debounce_init(contacts[i].debounce);
+    }
+
     /* The task ends here. The read/write callbacks will be invoked by the HAP Framework */
     vTaskDelete(NULL);
 }
