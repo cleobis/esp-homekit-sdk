@@ -1,3 +1,13 @@
+# My projects using ESP HomeKit SDK
+
+This fork of the ESP HomeKit SDK contains my personal projects in the mine sub-folder.
+
+* mine/alarm - A module for monitoring four contact sensors from a hardwired alarm panel and exposing them over HomeKit.
+
+SDK documentation is included below.
+
+---
+
 # ESP HomeKit SDK
 ## Introduction
 

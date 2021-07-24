@@ -1,4 +1,4 @@
-/* Derrived from iot_button.c from Espressif esp-homekit-sdk. Original license:
+/* Derrived from button.c from Espressif esp-homekit-sdk. Original license:
  *
  * ESPRSSIF MIT License
  *
@@ -71,7 +71,7 @@ struct debounce_dev{
 #define DEBOUNCE_GLITCH_FILTER_TIME_MS   50
 static const char* TAG = "debounce";
 
-static void debounce_debounce_cb(xTimerHandle tmr)
+static void debounce_filter_cb(xTimerHandle tmr)
 {
     debounce_cb_t* btn_cb = (debounce_cb_t*) pvTimerGetTimerID(tmr);
     debounce_dev_t* btn = btn_cb->pbtn;
@@ -139,7 +139,7 @@ debounce_handle_t iot_debounce_create(gpio_num_t gpio_num, debounce_active_t act
     btn->debounce_cb.interval = DEBOUNCE_GLITCH_FILTER_TIME_MS / portTICK_PERIOD_MS;
     btn->debounce_cb.pbtn = btn;
     btn->debounce_cb.tmr = xTimerCreate("btn_debounce_tmr", btn->debounce_cb.interval, pdFALSE,
-            &btn->debounce_cb, debounce_debounce_cb);
+            &btn->debounce_cb, debounce_filter_cb);
     btn->tap_psh_cb.arg = NULL;
     btn->tap_psh_cb.cb = NULL;
     btn->tap_rls_cb.arg = NULL;

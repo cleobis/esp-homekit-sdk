@@ -1,4 +1,4 @@
-/* Derrived from iot_button.c from Espressif esp-homekit-sdk. Original license:
+/* Derrived from iot_button.h from Espressif esp-homekit-sdk. Original license:
  *
  * ESPRSSIF MIT License
  *
@@ -145,6 +145,8 @@ esp_err_t iot_debounce_rm_cb(debounce_handle_t btn_handle, debounce_cb_type_t ty
 #endif
 
 #ifdef __cplusplus
+
+#error Have not yet written C++ interface for debounce.
 
 /**
  * class of button

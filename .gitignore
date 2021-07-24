@@ -8,6 +8,11 @@ examples/**/sdkconfig
 examples/**/sdkconfig.old
 examples/**/build
 
+# My project files
+mine/**/sdkconfig
+mine/**/sdkconfig.old
+mine/**/build
+
 # emacs
 .dir-locals.el
 

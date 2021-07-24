@@ -1,4 +1,8 @@
-/*
+/* HomeKit device that monitors 4 digital inputs and exposes them as contact sensors. Can be
+ * hooked up in parallel with a traditional home alarm system. 
+ *
+ * Based on example from Espressif HomeKit SDK. Original license:
+ * 
  * ESPRESSIF MIT License
  *
  * Copyright (c) 2018 <ESPRESSIF SYSTEMS (SHANGHAI) PTE LTD>
@@ -22,9 +26,6 @@
  *
  */
 
-/* HomeKit Bridge Example
-*/
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include <stdio.h>
 #include <string.h>
 
@@ -253,8 +254,8 @@ static void bridge_thread_entry(void *p)
     hap_enable_mfi_auth(HAP_MFI_AUTH_HW);
 
     /* Initialize Wi-Fi */
-    app_wifi_init();
-    esp_netif_set_hostname(wifi_netif, "esp32-alarm"); // Might not work here. Need to test
+    app_wifi_init_with_hostname("esp32-alarm");
+    
 
     /* After all the initializations are done, start the HAP core */
     hap_start();

@@ -239,7 +239,11 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-void app_wifi_init(void)
+void app_wifi_init(void) {
+    app_wifi_init_with_hostname("espressif");
+}
+
+void app_wifi_init_with_hostname(const char* hostname)
 {
     /* Initialize TCP/IP */
 #ifdef ESP_NETIF_SUPPORTED
@@ -255,6 +259,7 @@ void app_wifi_init(void)
     /* Initialize Wi-Fi including netif with default config */
 #ifdef ESP_NETIF_SUPPORTED
     esp_netif_t *wifi_netif = esp_netif_create_default_wifi_sta();
+    esp_netif_set_hostname(wifi_netif, hostname);
 #endif
 
     /* Register our event handler for Wi-Fi, IP and Provisioning related events */
